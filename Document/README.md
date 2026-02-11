@@ -74,12 +74,16 @@ cargo run
 
 ## 文件
 
-- [架構設計](Document/ARCHITECTURE.md)
-- [資料庫設計](Document/DATABASE.md)
-- [API 規格](Document/API.md)
-- [使用者流程](Document/USER_FLOW.md)
-- [收費方案](Document/PRICING.md)
-- [等級系統](Document/LEVEL_SYSTEM.md)
+- [架構設計](ARCHITECTURE.md)
+- [資料庫設計](DATABASE.md)
+- [API 規格](API.md)
+- [使用者流程](USER_FLOW.md)
+- [收費方案](PRICING.md)
+- [等級系統](LEVEL_SYSTEM.md)
+- [開發計劃](DEVELOPMENT_PLAN.md)
+- [開發日誌](DEVELOPMENT_LOG.md)
+- [執行追蹤](DEVELOPMENT_EXECUTION.md)
+- [測試計劃](TEST_PLAN.md)
 
 ## 授權
 
