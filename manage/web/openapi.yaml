@@ -1,0 +1,1014 @@
+openapi: 3.0.3
+info:
+  title: Nice Speak Manage API
+  description: |
+    軟體開發英語口語學習 App 管理後台 API
+    
+    ## 環境
+    - Development: http://localhost:32000/api/admin
+    - Production: https://manage.nicespeak.app/api/admin
+    
+    ## 認證
+    所有 API 都需要 Bearer Token 認證
+    
+    ## 版本
+    - v1.0.0
+  version: 1.0.0
+  contact:
+    name: Nice Speak Team
+    email: support@nicespeak.app
+
+servers:
+  - url: http://localhost:32000/api/admin
+    description: Development
+  - url: https://manage.nicespeak.app/api/admin
+    description: Production
+
+tags:
+  - name: Auth
+    description: 管理員認證
+  - name: Users
+    description: 管理員管理
+  - name: Customers
+    description: 客戶管理
+  - name: Scenarios
+    description: 情境模板管理
+  - name: Subscriptions
+    description: 訂閱管理
+  - name: Payments
+    description: 支付管理
+  - name: Analytics
+    description: 數據分析
+  - name: Settings
+    description: 系統設定
+  - name: Audit
+    description: 審計日誌
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ==================== ADMIN AUTH ====================
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: 管理員登入
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: 管理員登出
+      responses:
+        '200':
+          description: 登出成功
+
+  /auth/me:
+    get:
+      tags:
+        - Auth
+      summary: 取得當前管理員
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+
+  # ==================== ADMIN USERS ====================
+  /users:
+    get:
+      tags:
+        - Users
+      summary: 取得管理員列表
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: keyword
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+    post:
+      tags:
+        - Users
+      summary: 建立管理員
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: 建立成功
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: 取得管理員詳情
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      tags:
+        - Users
+      summary: 更新管理員
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      tags:
+        - Users
+      summary: 刪除管理員
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 刪除成功
+
+  # ==================== CUSTOMERS ====================
+  /customers:
+    get:
+      tags:
+        - Customers
+      summary: 取得客戶列表
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: keyword
+          schema:
+            type: string
+        - in: query
+          name: tier
+          schema:
+            type: string
+        - in: query
+          name: is_banned
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerListResponse'
+
+  /customers/{id}:
+    get:
+      tags:
+        - Customers
+      summary: 取得客戶詳情
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerDetail'
+    put:
+      tags:
+        - Customers
+      summary: 更新客戶狀態
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_banned:
+                  type: boolean
+                ban_reason:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+
+  /customers/{id}/subscriptions:
+    get:
+      tags:
+        - Customers
+      summary: 取得客戶訂閱歷史
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /customers/{id}/devices:
+    get:
+      tags:
+        - Customers
+      summary: 取得客戶設備列表
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /customers/{id}/practices:
+    get:
+      tags:
+        - Customers
+      summary: 取得客戶練習記錄
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  # ==================== SCENARIOS ====================
+  /scenarios:
+    get:
+      tags:
+        - Scenarios
+      summary: 取得情境列表
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: category
+          schema:
+            type: string
+        - in: query
+          name: difficulty
+          schema:
+            type: integer
+        - in: query
+          name: is_published
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: 成功
+    post:
+      tags:
+        - Scenarios
+      summary: 建立情境模板
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScenarioRequest'
+      responses:
+        '201':
+          description: 建立成功
+
+  /scenarios/{id}:
+    get:
+      tags:
+        - Scenarios
+      summary: 取得情境詳情
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    put:
+      tags:
+        - Scenarios
+      summary: 更新情境
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      tags:
+        - Scenarios
+      summary: 刪除情境
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 刪除成功
+
+  /scenarios/{id}/publish:
+    post:
+      tags:
+        - Scenarios
+      summary: 發布情境
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 發布成功
+
+  /scenarios/{id}/unpublish:
+    post:
+      tags:
+        - Scenarios
+      summary: 下架情境
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 下架成功
+
+  /scenarios/{id}/dialogues:
+    put:
+      tags:
+        - Scenarios
+      summary: 更新對話內容
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+
+  # ==================== SUBSCRIPTIONS ====================
+  /subscriptions/plans:
+    get:
+      tags:
+        - Subscriptions
+      summary: 取得訂閱方案列表
+      responses:
+        '200':
+          description: 成功
+    post:
+      tags:
+        - Subscriptions
+      summary: 建立訂閱方案
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlanRequest'
+      responses:
+        '201':
+          description: 建立成功
+
+  /subscriptions/plans/{id}:
+    put:
+      tags:
+        - Subscriptions
+      summary: 更新訂閱方案
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      tags:
+        - Subscriptions
+      summary: 刪除訂閱方案
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 刪除成功
+
+  /subscriptions/orders:
+    get:
+      tags:
+        - Subscriptions
+      summary: 取得訂閱訂單列表
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: tier
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /subscriptions/orders/{id}:
+    get:
+      tags:
+        - Subscriptions
+      summary: 取得訂單詳情
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /subscriptions/orders/{id}/refund:
+    post:
+      tags:
+        - Subscriptions
+      summary: 申請退款
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: 申請成功
+
+  # ==================== ANALYTICS ====================
+  /analytics/overview:
+    get:
+      tags:
+        - Analytics
+      summary: 取得數據總覽
+      parameters:
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsOverview'
+
+  /analytics/revenue:
+    get:
+      tags:
+        - Analytics
+      summary: 取得收入報表
+      parameters:
+        - in: query
+          name: start_date
+          schema:
+            type: string
+        - in: query
+          name: end_date
+          schema:
+            type: string
+        - in: query
+          name: group_by
+          schema:
+            type: string
+            enum: [day, week, month]
+      responses:
+        '200':
+          description: 成功
+
+  /analytics/users:
+    get:
+      tags:
+        - Analytics
+      summary: 取得用戶統計
+      parameters:
+        - in: query
+          name: start_date
+          schema:
+            type: string
+        - in: query
+          name: end_date
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /analytics/retention:
+    get:
+      tags:
+        - Analytics
+      summary: 取得留存分析
+      responses:
+        '200':
+          description: 成功
+
+  # ==================== SETTINGS ====================
+  /settings/roles:
+    get:
+      tags:
+        - Settings
+      summary: 取得角色列表
+      responses:
+        '200':
+          description: 成功
+    post:
+      tags:
+        - Settings
+      summary: 建立角色
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        '201':
+          description: 建立成功
+
+  /settings/roles/{id}:
+    put:
+      tags:
+        - Settings
+      summary: 更新角色
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+
+  /settings/categories:
+    get:
+      tags:
+        - Settings
+      summary: 取得分類列表
+      responses:
+        '200':
+          description: 成功
+    post:
+      tags:
+        - Settings
+      summary: 建立分類
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                code:
+                  type: string
+      responses:
+        '201':
+          description: 建立成功
+
+  /settings/parameters:
+    get:
+      tags:
+        - Settings
+      summary: 取得系統參數
+      responses:
+        '200':
+          description: 成功
+    put:
+      tags:
+        - Settings
+      summary: 更新系統參數
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateParametersRequest'
+      responses:
+        '200':
+          description: 更新成功
+
+  # ==================== AUDIT ====================
+  /audit/logs:
+    get:
+      tags:
+        - Audit
+      summary: 取得操作日誌
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: user_id
+          schema:
+            type: string
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: start_date
+          schema:
+            type: string
+        - in: query
+          name: end_date
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+  /audit/login-logs:
+    get:
+      tags:
+        - Audit
+      summary: 取得登入日誌
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: user_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+
+components:
+  schemas:
+    # Auth
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        user:
+          $ref: '#/components/schemas/AdminUser'
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    # Users
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUserItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    AdminUserItem:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        last_login_at:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+
+    # Customers
+    CustomerListResponse:
+      type: object
+      properties:
+        customers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CustomerItem:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        subscription_tier:
+          type: string
+        level:
+          type: integer
+        total_practices:
+          type: integer
+        average_score:
+          type: number
+        is_banned:
+          type: boolean
+        registered_at:
+          type: string
+
+    CustomerDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        subscription:
+          type: object
+        level:
+          type: object
+        devices:
+          type: array
+        practices:
+          type: array
+
+    # Scenarios
+    CreateScenarioRequest:
+      type: object
+      required:
+        - name
+        - role_1
+        - category
+        - difficulty
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        role_1:
+          type: string
+        role_2:
+          type: string
+        category:
+          type: string
+        difficulty:
+          type: integer
+          enum: [1, 2, 3, 4, 5]
+
+    # Subscriptions
+    CreatePlanRequest:
+      type: object
+      required:
+        - name
+        - tier
+        - price
+      properties:
+        name:
+          type: string
+        tier:
+          type: string
+        price:
+          type: number
+        description:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+
+    # Analytics
+    AnalyticsOverview:
+      type: object
+      properties:
+        total_users:
+          type: integer
+        active_users:
+          type: object
+          properties:
+            dau:
+              type: integer
+            mau:
+              type: integer
+        new_users:
+          type: integer
+        revenue:
+          type: object
+          properties:
+            today:
+              type: number
+            this_month:
+              type: number
+        conversions:
+          type: object
+          properties:
+            free_to_paid:
+              type: number
+        top_scenarios:
+          type: array
+
+    # Settings
+    CreateRoleRequest:
+      type: object
+      required:
+        - name
+        - code
+        - permissions
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    UpdateParametersRequest:
+      type: object
+      properties:
+        free_trial_days:
+          type: integer
+        evaluation_trial_days:
+          type: integer
+        max_practices_per_day:
+          type: integer
+
+    # Common
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

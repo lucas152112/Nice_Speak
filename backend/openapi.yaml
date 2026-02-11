@@ -1,0 +1,750 @@
+openapi: 3.0.3
+info:
+  title: Nice Speak API
+  description: |
+    軟體開發英語口語學習 App API
+    
+    ## 環境
+    - Development: http://localhost:3000/api/v1
+    - Production: https://api.nicespeak.app/v1
+    
+    ## 認證
+    所有 API 都需要 Bearer Token 認證
+    
+    ## 版本
+    - v1.0.0
+  version: 1.0.0
+  contact:
+    name: Nice Speak Team
+    email: support@nicespeak.app
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development
+  - url: https://api.nicespeak.app/v1
+    description: Production
+
+tags:
+  - name: Auth
+    description: 用戶認證
+  - name: Users
+    description: 用戶管理
+  - name: Scenarios
+    description: 情境管理
+  - name: Dialogues
+    description: 對話管理
+  - name: Practices
+    description: 練習管理
+  - name: Evaluations
+    description: 評估管理
+  - name: Levels
+    description: 等級管理
+  - name: Subscriptions
+    description: 訂閱管理
+  - name: Devices
+    description: 設備綁定
+  - name: Vocabulary
+    description: 單字庫
+  - name: Speech
+    description: 語音服務
+  - name: WebSocket
+    description: 即時通訊
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ==================== AUTH ====================
+  /auth/register:
+    post:
+      tags:
+        - Auth
+      summary: 用戶註冊
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: 註冊成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: 參數錯誤
+        '409':
+          description: 帳號已存在
+
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: 用戶登入
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: 帳號或密碼錯誤
+
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: 用戶登出
+      responses:
+        '200':
+          description: 登出成功
+
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: 刷新 Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+
+  /auth/forgot-password:
+    post:
+      tags:
+        - Auth
+      summary: 忘記密碼
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: 郵件已發送
+
+  # ==================== USERS ====================
+  /users/profile:
+    get:
+      tags:
+        - Users
+      summary: 取得用戶資料
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+    put:
+      tags:
+        - Users
+      summary: 更新用戶資料
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: 更新成功
+
+  /users/level:
+    get:
+      tags:
+        - Users
+      summary: 取得用戶等級
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserLevel'
+
+  /users/practice-history:
+    get:
+      tags:
+        - Users
+      summary: 取得練習歷史
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PracticeHistoryResponse'
+
+  # ==================== SCENARIOS ====================
+  /scenarios:
+    get:
+      tags:
+        - Scenarios
+      summary: 取得情境列表
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+        - in: query
+          name: difficulty
+          schema:
+            type: integer
+            enum: [1, 2, 3, 4, 5]
+        - in: query
+          name: role
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioListResponse'
+
+  /scenarios/{id}:
+    get:
+      tags:
+        - Scenarios
+      summary: 取得情境詳情
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioDetail'
+
+  # ==================== PRACTICES ====================
+  /practices/start:
+    post:
+      tags:
+        - Practices
+      summary: 開始練習
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scenario_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PracticeSession'
+
+  /practices/{id}/submit:
+    post:
+      tags:
+        - Practices
+      summary: 提交語音答案
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                transcript:
+                  type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResult'
+
+  /practices/{id}/complete:
+    post:
+      tags:
+        - Practices
+      summary: 完成練習
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PracticeCompleteResponse'
+
+  # ==================== DEVICES ====================
+  /devices/status:
+    post:
+      tags:
+        - Devices
+      summary: 檢查設備狀態
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_id:
+                  type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceStatus'
+
+  /devices/register:
+    post:
+      tags:
+        - Devices
+      summary: 註冊設備
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+      responses:
+        '200':
+          description: 成功
+
+  /devices/mark-trial-used:
+    post:
+      tags:
+        - Devices
+      summary: 標記設備已使用免費試用
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_id:
+                  type: string
+      responses:
+        '200':
+          description: 成功
+
+components:
+  # ==================== SCHEMAS ====================
+  schemas:
+    # Auth
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+          minLength: 1
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    RefreshRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        avatar:
+          type: string
+        level:
+          type: integer
+        subscription_tier:
+          type: string
+
+    # User Profile
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        avatar:
+          type: string
+        registered_at:
+          type: string
+          format: date-time
+        subscription:
+          $ref: '#/components/schemas/Subscription'
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        avatar:
+          type: string
+
+    UserLevel:
+      type: object
+      properties:
+        current_level:
+          type: integer
+          minimum: 0
+          maximum: 10
+        total_score:
+          type: integer
+        level_title:
+          type: string
+        progress_to_next:
+          type: integer
+        consecutive_wins:
+          type: integer
+        cumulative_practices:
+          type: integer
+        discount:
+          type: object
+          properties:
+            level_5:
+              type: boolean
+            level_10:
+              type: boolean
+
+    # Scenarios
+    ScenarioListResponse:
+      type: object
+      properties:
+        scenarios:
+          type: array
+          items:
+            $ref: '#/components/schemas/Scenario'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Scenario:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        role_1:
+          type: string
+        role_2:
+          type: string
+        category:
+          type: string
+        difficulty:
+          type: integer
+          enum: [1, 2, 3, 4, 5]
+        is_unlocked:
+          type: boolean
+
+    ScenarioDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        dialogues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dialogue'
+        vocabulary:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vocabulary'
+
+    Dialogue:
+      type: object
+      properties:
+        sequence:
+          type: integer
+        speaker:
+          type: string
+        content:
+          type: string
+        audio_url:
+          type: string
+
+    Vocabulary:
+      type: object
+      properties:
+        word:
+          type: string
+        definition:
+          type: string
+        example:
+          type: string
+
+    # Practices
+    PracticeSession:
+      type: object
+      properties:
+        practice_id:
+          type: string
+          format: uuid
+        dialogue:
+          $ref: '#/components/schemas/Dialogue'
+        started_at:
+          type: string
+          format: date-time
+
+    EvaluationResult:
+      type: object
+      properties:
+        pronunciation:
+          type: integer
+          minimum: 0
+          maximum: 30
+        grammar:
+          type: integer
+          minimum: 0
+          maximum: 30
+        vocabulary:
+          type: integer
+          minimum: 0
+          maximum: 20
+        fluency:
+          type: integer
+          minimum: 0
+          maximum: 20
+        total:
+          type: integer
+          minimum: 0
+          maximum: 100
+        feedback:
+          type: string
+        suggestions:
+          type: array
+          items:
+            type: string
+
+    PracticeCompleteResponse:
+      type: object
+      properties:
+        practice_id:
+          type: string
+        total_score:
+          type: integer
+        level_up:
+          type: object
+          properties:
+            leveled_up:
+              type: boolean
+            new_level:
+              type: integer
+        errors:
+          type: array
+          items:
+            type: object
+
+    PracticeHistoryResponse:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              scenario:
+                type: object
+              score:
+                type: integer
+              completed_at:
+                type: string
+                format: date-time
+
+    # Devices
+    DeviceStatus:
+      type: object
+      properties:
+        device_id:
+          type: string
+        has_used_free_trial:
+          type: boolean
+        is_banned:
+          type: boolean
+        first_used_at:
+          type: string
+          format: date-time
+        trial_expired_at:
+          type: string
+          format: date-time
+        can_use_free_trial:
+          type: boolean
+
+    RegisterDeviceRequest:
+      type: object
+      required:
+        - device_id
+        - platform
+      properties:
+        device_id:
+          type: string
+        platform:
+          type: string
+          enum: [android, ios, web]
+        fcm_token:
+          type: string
+
+    # Subscription
+    Subscription:
+      type: object
+      properties:
+        tier:
+          type: string
+          enum: [free, evaluation, basic, advanced, premium, platinum, unlimited]
+        status:
+          type: string
+          enum: [active, expired, cancelled]
+        started_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+    # Common
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+
+  # ==================== SECURITY SCHEMES ====================
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -6,20 +6,20 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss',
     '@pinia/nuxt',
     '@nuxtjs/i18n',
+    '@ant-design/nuxt',
   ],
 
   css: [
-    'element-plus/dist/index.css',
     '~/assets/css/main.css',
   ],
 
   build: {
-    transpile: ['element-plus/es', 'echarts'],
+    transpile: ['ant-design-vue', 'echarts'],
   },
 
   vite: {
     optimizeDeps: {
-      include: ['echarts', 'vue-echarts'],
+      include: ['echarts', 'vue-echarts', 'dayjs'],
     },
   },
 
@@ -42,7 +42,7 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      title: 'Nice Speak Admin',
+      title: 'Nice Speak Manage',
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
