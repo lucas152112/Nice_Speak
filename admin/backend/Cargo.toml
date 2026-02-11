@@ -1,0 +1,24 @@
+[package]
+name = "nice_speak_admin"
+version = "0.1.0"
+edition = "2021"
+description = "Nice Speak Admin Backend API"
+
+[dependencies]
+axum = { version = "0.7", features = ["ws"] }
+tower = { version = "0.4", features = ["limit"] }
+tower-http = { version = "0.4", features = ["cors", "validate-request"] }
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "uuid"] }
+chrono = { version = "0.4", features = ["serde"] }
+jsonwebtoken = "9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dotenv = "0.15"
+thiserror = "1"
+anyhow = "1"
+log = "0.4"
+env_logger = "0.10"
+
+[dev-dependencies]
