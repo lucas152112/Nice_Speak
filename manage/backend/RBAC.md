@@ -145,96 +145,152 @@ interface MenuItem {
 
 ## 5. 資料庫設計
 
-### 5.1 roles 表
+### 5.1 roles 表 (角色資料表)
 
 ```sql
 CREATE TABLE `roles` (
-    `id` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    `code` VARCHAR(50) NOT NULL UNIQUE COMMENT '角色代碼',
-    `name` VARCHAR(100) NOT NULL COMMENT '角色名稱',
-    `description` VARCHAR(255) NULL COMMENT '說明',
-    `is_system` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '系統內建',
-    `level` INT NOT NULL DEFAULT 0 COMMENT '權限等級',
-    `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '狀態',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- 主鍵與識別
+    `id` CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '角色唯一識別碼 (UUID)',
+    `code` VARCHAR(50) NOT NULL UNIQUE COMMENT '角色代碼 (如: super_admin, system_admin)',
+    `name` VARCHAR(100) NOT NULL COMMENT '角色名稱 (如: 超級管理員)',
+    
+    -- 描述與狀態
+    `description` VARCHAR(255) NULL COMMENT '角色說明描述',
+    `is_system` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否為系統內建角色 (0:否, 1:是)',
+    `level` INT NOT NULL DEFAULT 0 COMMENT '權限等級 (數字越大權限越高)',
+    `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '角色狀態 (0:停用, 1:啟用)',
+    
+    -- 時間戳
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建立時間',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間',
+    
+    -- 索引
     INDEX `idx_roles_code` (`code`),
     INDEX `idx_roles_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='角色資料表 - 儲存系統角色定義';
 ```
 
-### 5.2 permissions 表
+### 5.2 permissions 表 (權限資料表)
 
 ```sql
 CREATE TABLE `permissions` (
-    `id` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    `code` VARCHAR(100) NOT NULL UNIQUE COMMENT '權限代碼',
-    `name` VARCHAR(100) NOT NULL COMMENT '權限名稱',
-    `module` VARCHAR(50) NOT NULL COMMENT '所屬模組',
-    `type` VARCHAR(20) NOT NULL COMMENT '類型: read/write/delete/action',
-    `description` VARCHAR(255) NULL COMMENT '說明',
-    `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '狀態',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    -- 主鍵與識別
+    `id` CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '權限唯一識別碼 (UUID)',
+    `code` VARCHAR(100) NOT NULL UNIQUE COMMENT '權限代碼 (如: read:users, write:scenarios)',
+    `name` VARCHAR(100) NOT NULL COMMENT '權限名稱 (如: 讀取用戶)',
+    
+    -- 分類與類型
+    `module` VARCHAR(50) NOT NULL COMMENT '所屬模組 (如: users, scenarios, analytics)',
+    `type` VARCHAR(20) NOT NULL COMMENT '權限類型 (read:讀取, write:寫入, delete:刪除, action:操作)',
+    
+    -- 描述與狀態
+    `description` VARCHAR(255) NULL COMMENT '權限說明描述',
+    `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '權限狀態 (0:停用, 1:啟用)',
+    
+    -- 時間戳
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建立時間',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間',
+    
+    -- 索引
     INDEX `idx_permissions_module` (`module`),
     INDEX `idx_permissions_type` (`type`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='權限資料表 - 儲存系統權限定義';
 ```
 
-### 5.3 role_permissions 表
+### 5.3 role_permissions 表 (角色-權限關聯表)
 
 ```sql
 CREATE TABLE `role_permissions` (
-    `id` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    `role_id` CHAR(36) NOT NULL COMMENT '角色ID',
-    `permission_id` CHAR(36) NOT NULL COMMENT '權限ID',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- 主鍵
+    `id` CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '關聯記錄唯一識別碼 (UUID)',
+    
+    -- 外鍵關聯
+    `role_id` CHAR(36) NOT NULL COMMENT '角色ID (關聯 roles 表)',
+    `permission_id` CHAR(36) NOT NULL COMMENT '權限ID (關聯 permissions 表)',
+    
+    -- 時間戳
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建立時間',
+    
+    -- 約束與索引
     UNIQUE KEY `uk_role_permission` (`role_id`, `permission_id`),
     INDEX `idx_role_permissions_role_id` (`role_id`),
+    INDEX `idx_role_permissions_permission_id` (`permission_id`),
+    
     FOREIGN KEY (`role_id`) REFERENCES `roles`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`permission_id`) REFERENCES `permissions`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='角色-權限關聯表 - 儲存角色與權限的多對多關係';
 ```
 
-### 5.4 menus 表
+### 5.4 menus 表 (菜單資料表)
 
 ```sql
 CREATE TABLE `menus` (
-    `id` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    `name` VARCHAR(100) NOT NULL COMMENT '菜單名稱',
-    `icon` VARCHAR(50) NULL COMMENT '圖標',
-    `path` VARCHAR(255) NULL COMMENT '路徑',
-    `parent_id` CHAR(36) NULL COMMENT '父級ID',
-    `order` INT NOT NULL DEFAULT 0 COMMENT '排序',
-    `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '狀態',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX `idx_menus_parent_id` (`parent_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    -- 主鍵與識別
+    `id` CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '菜單唯一識別碼 (UUID)',
+    `name` VARCHAR(100) NOT NULL COMMENT '菜單名稱 (如: 儀表板, 客戶管理)',
+    
+    -- 結構與樣式
+    `icon` VARCHAR(50) NULL COMMENT '菜單圖標 (如: DashboardOutlined)',
+    `path` VARCHAR(255) NULL COMMENT '菜單路徑 (如: /dashboard, /customers)',
+    `parent_id` CHAR(36) NULL COMMENT '父級菜單ID (NULL表示頂級菜單)',
+    `order` INT NOT NULL DEFAULT 0 COMMENT '排序編號 (數字越小越前面)',
+    
+    -- 狀態
+    `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '菜單狀態 (0:停用, 1:啟用)',
+    
+    -- 時間戳
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建立時間',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間',
+    
+    -- 索引
+    INDEX `idx_menus_parent_id` (`parent_id`),
+    INDEX `idx_menus_order` (`order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='菜單資料表 - 儲存系統菜單定義';
 ```
 
-### 5.5 role_menus 表
+### 5.5 role_menus 表 (角色-菜單關聯表)
 
 ```sql
 CREATE TABLE `role_menus` (
-    `id` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    `role_id` CHAR(36) NOT NULL COMMENT '角色ID',
-    `menu_id` CHAR(36) NOT NULL COMMENT '菜單ID',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- 主鍵
+    `id` CHAR(36) PRIMARY KEY DEFAULT (UUID()) COMMENT '關聯記錄唯一識別碼 (UUID)',
+    
+    -- 外鍵關聯
+    `role_id` CHAR(36) NOT NULL COMMENT '角色ID (關聯 roles 表)',
+    `menu_id` CHAR(36) NOT NULL COMMENT '菜單ID (關聯 menus 表)',
+    
+    -- 時間戳
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建立時間',
+    
+    -- 約束與索引
     UNIQUE KEY `uk_role_menu` (`role_id`, `menu_id`),
     INDEX `idx_role_menus_role_id` (`role_id`),
+    INDEX `idx_role_menus_menu_id` (`menu_id`),
+    
     FOREIGN KEY (`role_id`) REFERENCES `roles`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`menu_id`) REFERENCES `menus`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='角色-菜單關聯表 - 儲存角色可訪問的菜單權限';
 ```
 
-### 5.6 admin_users 表 (新增欄位)
+### 5.6 admin_users 表 (管理員用戶表 - 新增欄位)
 
 ```sql
-ALTER TABLE `admin_users` ADD COLUMN `role_id` CHAR(36) NULL COMMENT '角色ID' AFTER `password`;
-ALTER TABLE `admin_users` ADD COLUMN `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '狀態' AFTER `role_id`;
+-- 新增 role_id 欄位
+ALTER TABLE `admin_users` 
+    ADD COLUMN `role_id` CHAR(36) NULL COMMENT '關聯角色ID (關聯 roles 表)' AFTER `password`;
 
+-- 新增 status 欄位
+ALTER TABLE `admin_users` 
+    ADD COLUMN `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '帳號狀態 (0:停用, 1:啟用)' AFTER `role_id`;
+
+-- 建立索引
 CREATE INDEX `idx_admin_users_role_id` ON `admin_users`(`role_id`);
+CREATE INDEX `idx_admin_users_status` ON `admin_users`(`status`);
 ```
 
 ---
@@ -362,5 +418,46 @@ INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES
 
 ---
 
-**版本**: v1.0.0  
-**建立日期**: 2024-XX-XX
+## 8. 實體關係圖 (ER Diagram)
+
+```
+┌─────────────────┐       ┌───────────────────────┐       ┌─────────────────┐
+│     roles       │       │    role_permissions   │       │   permissions   │
+├─────────────────┤       ├───────────────────────┤       ├─────────────────┤
+│ id (PK)         │◄──────│ role_id (FK)          │──────►│ id (PK)         │
+│ code (UQ)       │       │ permission_id (FK)    │       │ code (UQ)       │
+│ name            │       │ created_at            │       │ name            │
+│ description     │       └───────────────────────┘       │ module          │
+│ is_system       │                                       │ type            │
+│ level           │                                       │ description     │
+│ status          │                                       │ status          │
+│ created_at      │                                       │ created_at      │
+│ updated_at      │                                       │ updated_at      │
+└─────────────────┘                                       └─────────────────┘
+      │                                                             │
+      │                                                             │
+      ▼                                                             ▼
+┌─────────────────┐                                           ┌─────────────────┐
+│   admin_users   │                                           │      menus      │
+├─────────────────┤                                           ├─────────────────┤
+│ id (PK)         │                                           │ id (PK)         │
+│ email           │                                           │ name            │
+│ password        │                                           │ icon            │
+│ name            │                                           │ path            │
+│ role_id (FK)   │                                           │ parent_id (FK)  │
+│ status         │                                           │ order           │
+│ created_at      │       ┌───────────────────────┐           │ status          │
+│ updated_at      │       │    role_menus         │           │ created_at      │
+└─────────────────┘       ├───────────────────────┤           │ updated_at      │
+                           │ id (PK)               │           └─────────────────┘
+                           │ role_id (FK)          │◄──────┐
+                           │ menu_id (FK)          │◄──────┘
+                           │ created_at            │
+                           └───────────────────────┘
+```
+
+---
+
+**版本**: v1.1.0  
+**建立日期**: 2024-XX-XX  
+**最後更新**: 2026-02-11
