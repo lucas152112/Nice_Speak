@@ -21,7 +21,7 @@
 |------|------|
 | 前端 | Flutter (iOS/Android/H5) |
 | 後端 | Rust + Axum |
-| 資料庫 | PostgreSQL + Redis |
+| 資料庫 | MySQL 8 + Redis + MongoDB |
 | 語音 | STT/TTS API |
 | AI 評估 | LLM (GPT-4/Claude) |
 | 認證 | JWT |
