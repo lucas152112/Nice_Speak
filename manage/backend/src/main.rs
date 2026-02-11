@@ -1,14 +1,16 @@
-// admin_backend/src/main.rs
+// manage_backend/src/main.rs
 
-use axum::{routing::{post, get}, Router, Json};
+use axum::{routing::{post, get, put, delete}, Router};
 use dotenv::dotenv;
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
-use serde::Deserialize;
 
 mod config;
 mod auth;
 mod users;
+mod roles;
+mod permissions;
+mod menus;
 mod customers;
 mod scenarios;
 mod subscriptions;
@@ -25,16 +27,14 @@ async fn main() -> anyhow::Result<()> {
     
     let config = Config::from_env()?;
     
-    // CORS
     let cors = CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
         .allow_methods(tower_http::cors::Any)
         .allow_headers(tower_http::cors::Any);
 
-    // Router
     let app = Router::new()
         // Health
-        .route("/health", post(|| async { "OK" }))
+        .route("/health", get(|| async { "OK" }))
         // Auth
         .route("/api/admin/auth/login", post(auth::login))
         .route("/api/admin/auth/logout", post(auth::logout))
@@ -45,7 +45,26 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/admin/users/:id", get(users::get))
         .route("/api/admin/users/:id", put(users::update))
         .route("/api/admin/users/:id", delete(users::delete))
-        // Customers (End Users)
+        // Roles
+        .route("/api/admin/roles", get(roles::list))
+        .route("/api/admin/roles", post(roles::create))
+        .route("/api/admin/roles/:id", get(roles::get))
+        .route("/api/admin/roles/:id", put(roles::update))
+        .route("/api/admin/roles/:id", delete(roles::delete))
+        .route("/api/admin/roles/:id/permissions", get(roles::permissions))
+        .route("/api/admin/roles/:id/permissions", put(roles::update_permissions))
+        // Permissions
+        .route("/api/admin/permissions", get(permissions::list))
+        .route("/api/admin/permissions/grouped", get(permissions::grouped))
+        // Menus
+        .route("/api/admin/menus", get(menus::list))
+        .route("/api/admin/menus", post(menus::create))
+        .route("/api/admin/menus/tree", get(menus::tree))
+        .route("/api/admin/menus/:id", get(menus::get))
+        .route("/api/admin/menus/:id", put(menus::update))
+        .route("/api/admin/menus/:id", delete(menus::delete))
+        .route("/api/admin/menus/reorder", put(menus::reorder))
+        // Customers
         .route("/api/admin/customers", get(customers::list))
         .route("/api/admin/customers/:id", get(customers::get))
         .route("/api/admin/customers/:id/subscriptions", get(customers::subscriptions))
@@ -85,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(cors);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.admin_port));
-    log::info!("🚀 Admin Server running on http://{}", addr);
+    log::info!("🚀 Manage Server running on http://{}", addr);
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -93,6 +112,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-// Helper type aliases
-type Json<T> = axum::Json<T>;
