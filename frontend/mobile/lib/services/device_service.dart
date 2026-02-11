@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DeviceService {
   static final DeviceService _instance = DeviceService._internal();
@@ -38,11 +39,9 @@ class DeviceService {
           iosInfo.model,
         );
       } else if (kIsWeb) {
-        // Web 平台使用瀏覽器指紋
         deviceId = await _getWebFingerprint();
       }
     } catch (e) {
-      // 如果無法取得設備資訊，產生隨機 ID
       deviceId = _generateFallbackId();
     }
 
@@ -61,7 +60,6 @@ class DeviceService {
 
   /// Web 指紋
   Future<String> _getWebFingerprint() async {
-    // 簡化版 Web 指紋
     final input = '${DateTime.now().millisecondsSinceEpoch}';
     final bytes = utf8.encode(input);
     final digest = sha256.convert(bytes);
@@ -75,16 +73,33 @@ class DeviceService {
     return digest.toString().substring(0, 32);
   }
 
+  /// 取得本地初次使用時間
+  Future<DateTime?> getFirstUseDate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final timestamp = prefs.getInt('first_use_timestamp');
+    if (timestamp != null) {
+      return DateTime.fromMillisecondsSinceEpoch(timestamp);
+    }
+    return null;
+  }
+
+  /// 設定初次使用時間
+  Future<void> setFirstUseDate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await prefs.setInt('first_use_timestamp', now);
+  }
+
   /// 檢查設備狀態
   Future<DeviceStatus> checkDeviceStatus(String deviceId) async {
-    // TODO: 呼叫後端 API 檢查設備狀態
-    // GET /api/v1/devices/{deviceId}/status
     try {
-      // 模擬 API 回應
+      // TODO: 呼叫後端 API 檢查設備狀態
       return DeviceStatus(
         deviceId: deviceId,
         hasUsedFreeTrial: false,
         isBanned: false,
+        firstUsedAt: null,
+        trialExpiredAt: null,
       );
     } catch (e) {
       return DeviceStatus(
@@ -94,6 +109,67 @@ class DeviceService {
         error: e.toString(),
       );
     }
+  }
+
+  /// 檢查是否可以免費試用 (含時間邏輯)
+  Future<FreeTrialResult> checkFreeTrialStatus() async {
+    final deviceId = await getDeviceId();
+    final localFirstUse = await getFirstUseDate();
+    
+    // 如果本地沒有初次使用時間，寫入並允許使用
+    if (localFirstUse == null) {
+      await setFirstUseDate();
+      return FreeTrialResult(
+        canUse: true,
+        reason: FreeTrialReason.firstTime,
+        daysRemaining: 3,
+      );
+    }
+
+    // 檢查後端設備狀態
+    final status = await checkDeviceStatus(deviceId);
+    
+    if (status.isBanned) {
+      return FreeTrialResult(
+        canUse: false,
+        reason: FreeTrialReason.banned,
+        daysRemaining: 0,
+      );
+    }
+
+    if (status.hasUsedFreeTrial) {
+      return FreeTrialResult(
+        canUse: false,
+        reason: FreeTrialReason.alreadyUsed,
+        daysRemaining: 0,
+      );
+    }
+
+    // 計算剩餘天數
+    final trialEndDate = status.trialExpiredAt ?? localFirstUse.add(const Duration(days: 3));
+    final now = DateTime.now();
+    final daysRemaining = trialEndDate.difference(now).inDays;
+
+    if (daysRemaining <= 0) {
+      return FreeTrialResult(
+        canUse: false,
+        reason: FreeTrialReason.expired,
+        daysRemaining: 0,
+      );
+    }
+
+    return FreeTrialResult(
+      canUse: true,
+      reason: FreeTrialReason.active,
+      daysRemaining: daysRemaining,
+    );
+  }
+
+  /// 標記設備已使用免費試用
+  Future<bool> markFreeTrialUsed() async {
+    final deviceId = await getDeviceId();
+    // TODO: 呼叫後端 API
+    return true;
   }
 }
 
@@ -102,90 +178,40 @@ class DeviceStatus {
   final String deviceId;
   final bool hasUsedFreeTrial;
   final bool isBanned;
+  final DateTime? firstUsedAt;
+  final DateTime? trialExpiredAt;
   final String? error;
 
   DeviceStatus({
     required this.deviceId,
     required this.hasUsedFreeTrial,
     required this.isBanned,
+    this.firstUsedAt,
+    this.trialExpiredAt,
     this.error,
   });
 
   bool get canUseFreeTrial => !hasUsedFreeTrial && !isBanned;
 }
 
-/// 設備註冊請求
-class DeviceRegistration {
-  final String deviceId;
-  final String platform; // android, ios, web
-  final String? fcmToken; // Firebase Cloud Messaging Token
+/// 免費試用結果
+class FreeTrialResult {
+  final bool canUse;
+  final FreeTrialReason reason;
+  final int daysRemaining;
 
-  DeviceRegistration({
-    required this.deviceId,
-    required this.platform,
-    this.fcmToken,
+  FreeTrialResult({
+    required this.canUse,
+    required this.reason,
+    required this.daysRemaining,
   });
-
-  Map<String, dynamic> toJson() => {
-        'device_id': deviceId,
-        'platform': platform,
-        'fcm_token': fcmToken,
-      };
 }
 
-/// 設備綁定服務
-class DeviceBindingService {
-  static final DeviceBindingService _instance = DeviceBindingService._internal();
-  factory DeviceBindingService() => _instance;
-  DeviceBindingService._internal();
-
-  final DeviceService _deviceService = DeviceService();
-
-  /// 初始化設備綁定
-  Future<DeviceBindingResult> initialize() async {
-    try {
-      final deviceId = await _deviceService.getDeviceId();
-      final status = await _deviceService.checkDeviceStatus(deviceId);
-
-      return DeviceBindingResult(
-        success: true,
-        deviceId: deviceId,
-        status: status,
-      );
-    } catch (e) {
-      return DeviceBindingResult(
-        success: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  /// 標記設備已使用免費試用
-  Future<bool> markFreeTrialUsed(String deviceId) async {
-    // TODO: 呼叫後端 API
-    // POST /api/v1/devices/{deviceId}/mark-trial-used
-    return true;
-  }
-
-  /// 檢查是否可以免費試用
-  Future<bool> canUseFreeTrial() async {
-    final deviceId = await _deviceService.getDeviceId();
-    final status = await _deviceService.checkDeviceStatus(deviceId);
-    return status.canUseFreeTrial;
-  }
-}
-
-/// 設備綁定結果
-class DeviceBindingResult {
-  final bool success;
-  final String? deviceId;
-  final DeviceStatus? status;
-  final String? error;
-
-  DeviceBindingResult({
-    required this.success,
-    this.deviceId,
-    this.status,
-    this.error,
-  });
+/// 免費試用原因
+enum FreeTrialReason {
+  firstTime,      // 初次使用
+  active,         // 試用中
+  alreadyUsed,    // 已使用過
+  expired,        // 已過期
+  banned,         // 被封禁
 }
