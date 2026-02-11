@@ -53,6 +53,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/admin/roles/:id", delete(roles::delete))
         .route("/api/admin/roles/:id/permissions", get(roles::permissions))
         .route("/api/admin/roles/:id/permissions", put(roles::update_permissions))
+        .route("/api/admin/roles/:id/menus", get(roles::menus))
+        .route("/api/admin/roles/:id/menus", put(roles::update_menus))
         // Permissions
         .route("/api/admin/permissions", get(permissions::list))
         .route("/api/admin/permissions/grouped", get(permissions::grouped))

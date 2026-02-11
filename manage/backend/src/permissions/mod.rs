@@ -1,16 +1,12 @@
 // manage/backend/src/permissions/mod.rs
 
-use axum::{Json, response::IntoResponse};
+use axum::{Json, response::IntoResponse, extract::{Query, Path}};
 use serde::{Deserialize, Serialize};
+use sqlx::MySqlPool;
 
-// 權限列表回應
-#[derive(Serialize)]
-pub struct PermissionListResponse {
-    pub permissions: Vec<Permission>,
-    pub grouped: Vec<PermissionGroup>,
-}
+// ==================== TYPES ====================
 
-#[derive(Serialize)]
+#[derive(Serialize, sqlx::FromRow)]
 pub struct Permission {
     pub id: String,
     pub code: String,
@@ -18,194 +14,287 @@ pub struct Permission {
     pub module: String,
     pub type_: String,
     pub description: Option<String>,
+    pub status: bool,
+}
+
+#[derive(Serialize)]
+pub struct PermissionListResponse {
+    pub permissions: Vec<Permission>,
+    pub total: i64,
 }
 
 #[derive(Serialize)]
 pub struct PermissionGroup {
     pub module: String,
+    pub display_name: String,
     pub permissions: Vec<Permission>,
 }
 
+#[derive(Serialize)]
+pub struct PermissionGroupedResponse {
+    pub groups: Vec<PermissionGroup>,
+    pub total: i64,
+}
+
+#[derive(Deserialize)]
+pub struct PermissionQuery {
+    pub module: Option<String>,
+    pub type_: Option<String>,
+    pub keyword: Option<String>,
+}
+
+// 模組顯示名稱對照
+const MODULE_NAMES: &[(&str, &str)] = &[
+    ("users", "用戶管理"),
+    ("customers", "客戶管理"),
+    ("scenarios", "情境管理"),
+    ("subscriptions", "訂閱管理"),
+    ("analytics", "數據分析"),
+    ("settings", "系統設定"),
+    ("audit", "審計日誌"),
+    ("roles", "角色管理"),
+    ("permissions", "權限管理"),
+    ("menus", "選單管理"),
+];
+
+// 類型顯示名稱對照
+const TYPE_NAMES: &[(&str, &str)] = &[
+    ("read", "讀取"),
+    ("write", "寫入"),
+    ("delete", "刪除"),
+    ("action", "操作"),
+];
+
+// ==================== HANDLERS ====================
+
 // 取得權限列表
-pub async fn list() -> impl IntoResponse {
+pub async fn list(
+    Query(query): Query<PermissionQuery>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    let conditions = build_conditions(&query);
+    
+    let sql = format!(
+        r#"
+        SELECT id, code, name, module, type as type_, description, status
+        FROM permissions
+        WHERE {}
+        ORDER BY module, type_, name
+        "#,
+        conditions
+    );
+
+    let permissions: Vec<Permission> = sqlx::query_as(&sql)
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_default();
+
     Json(PermissionListResponse {
-        permissions: vec![
-            Permission {
-                id: "perm-001".to_string(),
-                code: "read:users".to_string(),
-                name: "讀取用戶".to_string(),
-                module: "users".to_string(),
-                type_: "read".to_string(),
-                description: None,
-            },
-            Permission {
-                id: "perm-002".to_string(),
-                code: "write:users".to_string(),
-                name: "新增用戶".to_string(),
-                module: "users".to_string(),
-                type_: "write".to_string(),
-                description: None,
-            },
-            Permission {
-                id: "perm-003".to_string(),
-                code: "delete:users".to_string(),
-                name: "刪除用戶".to_string(),
-                module: "users".to_string(),
-                type_: "delete".to_string(),
-                description: None,
-            },
-            Permission {
-                id: "perm-004".to_string(),
-                code: "read:customers".to_string(),
-                name: "讀取客戶".to_string(),
-                module: "customers".to_string(),
-                type_: "read".to_string(),
-                description: None,
-            },
-            Permission {
-                id: "perm-005".to_string(),
-                code: "manage:scenarios".to_string(),
-                name: "情境管理".to_string(),
-                module: "scenarios".to_string(),
-                type_: "write".to_string(),
-                description: Some("全部情境操作".to_string()),
-            },
-            Permission {
-                id: "perm-006".to_string(),
-                code: "manage:subscriptions".to_string(),
-                name: "訂閱管理".to_string(),
-                module: "subscriptions".to_string(),
-                type_: "write".to_string(),
-                description: Some("全部訂閱操作".to_string()),
-            },
-            Permission {
-                id: "perm-007".to_string(),
-                code: "read:analytics".to_string(),
-                name: "讀取分析".to_string(),
-                module: "analytics".to_string(),
-                type_: "read".to_string(),
-                description: None,
-            },
-            Permission {
-                id: "perm-008".to_string(),
-                code: "export:analytics".to_string(),
-                name: "匯出數據".to_string(),
-                module: "analytics".to_string(),
-                type_: "action".to_string(),
-                description: None,
-            },
-            Permission {
-                id: "perm-009".to_string(),
-                code: "manage:roles".to_string(),
-                name: "角色管理".to_string(),
-                module: "roles".to_string(),
-                type_: "write".to_string(),
-                description: None,
-            },
-            Permission {
-                id: "perm-010".to_string(),
-                code: "manage:menus".to_string(),
-                name: "選單管理".to_string(),
-                module: "menus".to_string(),
-                type_: "write".to_string(),
-                description: None,
-            },
-        ],
-        grouped: vec![
-            PermissionGroup {
-                module: "用戶管理".to_string(),
-                permissions: vec![
-                    Permission {
-                        id: "perm-001".to_string(),
-                        code: "read:users".to_string(),
-                        name: "讀取用戶".to_string(),
-                        module: "users".to_string(),
-                        type_: "read".to_string(),
-                        description: None,
-                    },
-                ],
-            },
-            PermissionGroup {
-                module: "客戶管理".to_string(),
-                permissions: vec![
-                    Permission {
-                        id: "perm-004".to_string(),
-                        code: "read:customers".to_string(),
-                        name: "讀取客戶".to_string(),
-                        module: "customers".to_string(),
-                        type_: "read".to_string(),
-                        description: None,
-                    },
-                ],
-            },
-            PermissionGroup {
-                module: "情境管理".to_string(),
-                permissions: vec![
-                    Permission {
-                        id: "perm-005".to_string(),
-                        code: "manage:scenarios".to_string(),
-                        name: "情境管理".to_string(),
-                        module: "scenarios".to_string(),
-                        type_: "write".to_string(),
-                        description: None,
-                    },
-                ],
-            },
-            PermissionGroup {
-                module: "訂閱管理".to_string(),
-                permissions: vec![
-                    Permission {
-                        id: "perm-006".to_string(),
-                        code: "manage:subscriptions".to_string(),
-                        name: "訂閱管理".to_string(),
-                        module: "subscriptions".to_string(),
-                        type_: "write".to_string(),
-                        description: None,
-                    },
-                ],
-            },
-            PermissionGroup {
-                module: "數據分析".to_string(),
-                permissions: vec![
-                    Permission {
-                        id: "perm-007".to_string(),
-                        code: "read:analytics".to_string(),
-                        name: "讀取分析".to_string(),
-                        module: "analytics".to_string(),
-                        type_: "read".to_string(),
-                        description: None,
-                    },
-                    Permission {
-                        id: "perm-008".to_string(),
-                        code: "export:analytics".to_string(),
-                        name: "匯出數據".to_string(),
-                        module: "analytics".to_string(),
-                        type_: "action".to_string(),
-                        description: None,
-                    },
-                ],
-            },
-            PermissionGroup {
-                module: "系統管理".to_string(),
-                permissions: vec![
-                    Permission {
-                        id: "perm-009".to_string(),
-                        code: "manage:roles".to_string(),
-                        name: "角色管理".to_string(),
-                        module: "roles".to_string(),
-                        type_: "write".to_string(),
-                        description: None,
-                    },
-                    Permission {
-                        id: "perm-010".to_string(),
-                        code: "manage:menus".to_string(),
-                        name: "選單管理".to_string(),
-                        module: "menus".to_string(),
-                        type_: "write".to_string(),
-                        description: None,
-                    },
-                ],
-            },
-        ],
+        permissions,
+        total: permissions.len() as i64,
     })
+}
+
+// 取得分組權限
+pub async fn grouped(
+    Query(_query): Query<PermissionQuery>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    let permissions: Vec<Permission> = sqlx::query_as!(
+        Permission,
+        r#"
+        SELECT id, code, name, module, type as type_, description, status
+        FROM permissions
+        ORDER BY module, type_, name
+        "#
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+
+    // 按模組分組
+    let mut groups: Vec<PermissionGroup> = Vec::new();
+    let mut current_module = String::new();
+    let mut current_group: Option<PermissionGroup> = None;
+
+    for perm in permissions {
+        if perm.module != current_module {
+            if let Some(group) = current_group.take() {
+                groups.push(group);
+            }
+            current_module = perm.module.clone();
+            current_group = Some(PermissionGroup {
+                module: perm.module.clone(),
+                display_name: get_module_name(&perm.module),
+                permissions: Vec::new(),
+            });
+        }
+        if let Some(group) = current_group.as_mut() {
+            group.permissions.push(perm);
+        }
+    }
+
+    // 加入最後一個群組
+    if let Some(group) = current_group {
+        groups.push(group);
+    }
+
+    Json(PermissionGroupedResponse {
+        groups,
+        total: permissions.len() as i64,
+    })
+}
+
+// 取得權限詳情
+pub async fn get(
+    Path(id): Path<String>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    let permission: Option<Permission> = sqlx::query_as!(
+        Permission,
+        r#"
+        SELECT id, code, name, module, type as type_, description, status
+        FROM permissions WHERE id = ?
+        "#,
+        id
+    )
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+
+    match permission {
+        Some(perm) => Json(perm),
+        None => Json(serde_json::json!({
+            "error": "權限不存在",
+            "code": "PERMISSION_NOT_FOUND"
+        })),
+    }
+}
+
+// 建立權限
+pub async fn create(
+    Json(payload): Json<CreatePermissionRequest>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    // 檢查權限代碼是否已存在
+    let exists: Option<String> = sqlx::query_scalar!(
+        "SELECT id FROM permissions WHERE code = ?",
+        payload.code
+    )
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+
+    if exists.is_some() {
+        return Json(serde_json::json!({
+            "error": "權限代碼已存在",
+            "code": "CODE_EXISTS"
+        }));
+    }
+
+    let perm_id = uuid::Uuid::new_v4().to_string();
+    let _ = sqlx::query!(
+        r#"
+        INSERT INTO permissions (id, code, name, module, type, description, status)
+        VALUES (?, ?, ?, ?, ?, ?, 1)
+        "#,
+        perm_id, payload.code, payload.name, payload.module, payload.type, payload.description
+    )
+    .execute(&pool)
+    .await;
+
+    Json(serde_json::json!({
+        "success": true,
+        "permission": {
+            "id": perm_id,
+            "code": payload.code,
+            "name": payload.name,
+        }
+    }))
+}
+
+// 更新權限
+pub async fn update(
+    Path(id): Path<String>,
+    Json(payload): Json<UpdatePermissionRequest>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    let _ = sqlx::query!(
+        r#"
+        UPDATE permissions 
+        SET name = ?, module = ?, type = ?, description = ?, updated_at = NOW()
+        WHERE id = ?
+        "#,
+        payload.name, payload.module, payload.type, payload.description, id
+    )
+    .execute(&pool)
+    .await;
+
+    Json(serde_json::json!({
+        "success": true,
+        "message": "權限更新成功"
+    }))
+}
+
+// 刪除權限
+pub async fn delete(
+    Path(id): Path<String>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    let _ = sqlx::query!("DELETE FROM permissions WHERE id = ?", id)
+        .execute(&pool)
+        .await;
+
+    Json(serde_json::json!({
+        "success": true,
+        "message": "權限刪除成功"
+    }))
+}
+
+// ==================== HELPER FUNCTIONS ====================
+
+fn build_conditions(query: &PermissionQuery) -> String {
+    let mut conditions = vec!["1=1".to_string()];
+    
+    if let Some(module) = &query.module {
+        conditions.push(format!("module = '{}'", module));
+    }
+    if let Some(type_) = &query.type_ {
+        conditions.push(format!("type = '{}'", type_));
+    }
+    if let Some(keyword) = &query.keyword {
+        conditions.push(format!(
+            "(name LIKE CONCAT('%', '{}', '%') OR code LIKE CONCAT('%', '{}', '%'))",
+            keyword, keyword
+        ));
+    }
+    
+    conditions.join(" AND ")
+}
+
+fn get_module_name(module: &str) -> String {
+    MODULE_NAMES.iter()
+        .find(|(m, _)| *m == module)
+        .map(|(_, name)| *name)
+        .unwrap_or(module)
+        .to_string()
+}
+
+// ==================== REQUEST TYPES ====================
+
+#[derive(Deserialize)]
+pub struct CreatePermissionRequest {
+    pub code: String,
+    pub name: String,
+    pub module: String,
+    pub type_: String,
+    pub description: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct UpdatePermissionRequest {
+    pub name: String,
+    pub module: String,
+    pub type_: String,
+    pub description: Option<String>,
 }

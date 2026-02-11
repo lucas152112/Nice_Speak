@@ -1,10 +1,12 @@
 // manage/backend/src/menus/mod.rs
 
-use axum::{Json, response::IntoResponse, extract::Path};
+use axum::{Json, response::IntoResponse, extract::{Query, Path}};
 use serde::{Deserialize, Serialize};
+use sqlx::MySqlPool;
 
-// 菜單項目
-#[derive(Serialize, Deserialize)]
+// ==================== TYPES ====================
+
+#[derive(Serialize, sqlx::FromRow)]
 pub struct MenuItem {
     pub id: String,
     pub name: String,
@@ -13,16 +15,32 @@ pub struct MenuItem {
     pub parent_id: Option<String>,
     pub order: i32,
     pub status: bool,
-    pub children: Option<Vec<MenuItem>>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-// 樹狀結構回應
 #[derive(Serialize)]
 pub struct MenuTreeResponse {
-    pub menus: Vec<MenuItem>,
+    pub menus: Vec<MenuNode>,
 }
 
-// 創建菜單請求
+#[derive(Serialize)]
+pub struct MenuNode {
+    pub id: String,
+    pub name: String,
+    pub icon: Option<String>,
+    pub path: Option<String>,
+    pub order: i32,
+    pub status: bool,
+    pub children: Vec<MenuNode>,
+}
+
+#[derive(Serialize)]
+pub struct MenuListResponse {
+    pub menus: Vec<MenuItem>,
+    pub total: i64,
+}
+
 #[derive(Deserialize)]
 pub struct CreateMenuRequest {
     pub name: String,
@@ -32,7 +50,6 @@ pub struct CreateMenuRequest {
     pub order: i32,
 }
 
-// 更新菜單請求
 #[derive(Deserialize)]
 pub struct UpdateMenuRequest {
     pub name: String,
@@ -42,7 +59,6 @@ pub struct UpdateMenuRequest {
     pub order: i32,
 }
 
-// 調整順序請求
 #[derive(Deserialize)]
 pub struct ReorderRequest {
     pub orders: Vec<MenuOrderItem>,
@@ -54,221 +70,131 @@ pub struct MenuOrderItem {
     pub order: i32,
 }
 
-// 取得菜單列表
-pub async fn list() -> impl IntoResponse {
-    Json(MenuTreeResponse {
-        menus: vec![
-            MenuItem {
-                id: "menu-001".to_string(),
-                name: "儀表板".to_string(),
-                icon: Some("DashboardOutlined".to_string()),
-                path: Some("/dashboard".to_string()),
-                parent_id: None,
-                order: 1,
-                status: true,
-                children: None,
-            },
-            MenuItem {
-                id: "menu-002".to_string(),
-                name: "客戶管理".to_string(),
-                icon: Some("UserOutlined".to_string()),
-                path: Some("/customers".to_string()),
-                parent_id: None,
-                order: 2,
-                status: true,
-                children: Some(vec![
-                    MenuItem {
-                        id: "menu-002-1".to_string(),
-                        name: "客戶列表".to_string(),
-                        icon: Some("TeamOutlined".to_string()),
-                        path: Some("/customers".to_string()),
-                        parent_id: Some("menu-002".to_string()),
-                        order: 1,
-                        status: true,
-                        children: None,
-                    },
-                ]),
-            },
-            MenuItem {
-                id: "menu-003".to_string(),
-                name: "情境模板".to_string(),
-                icon: Some("FileTextOutlined".to_string()),
-                path: Some("/scenarios".to_string()),
-                parent_id: None,
-                order: 3,
-                status: true,
-                children: Some(vec![
-                    MenuItem {
-                        id: "menu-003-1".to_string(),
-                        name: "模板列表".to_string(),
-                        icon: Some("UnorderedListOutlined".to_string()),
-                        path: Some("/scenarios".to_string()),
-                        parent_id: Some("menu-003".to_string()),
-                        order: 1,
-                        status: true,
-                        children: None,
-                    },
-                    MenuItem {
-                        id: "menu-003-2".to_string(),
-                        name: "新增模板".to_string(),
-                        icon: Some("PlusOutlined".to_string()),
-                        path: Some("/scenarios/create".to_string()),
-                        parent_id: Some("menu-003".to_string()),
-                        order: 2,
-                        status: true,
-                        children: None,
-                    },
-                ]),
-            },
-            MenuItem {
-                id: "menu-004".to_string(),
-                name: "收費管理".to_string(),
-                icon: Some("DollarOutlined".to_string()),
-                path: Some("/subscriptions".to_string()),
-                parent_id: None,
-                order: 4,
-                status: true,
-                children: Some(vec![
-                    MenuItem {
-                        id: "menu-004-1".to_string(),
-                        name: "方案管理".to_string(),
-                        icon: Some("TagsOutlined".to_string()),
-                        path: Some("/subscriptions/plans".to_string()),
-                        parent_id: Some("menu-004".to_string()),
-                        order: 1,
-                        status: true,
-                        children: None,
-                    },
-                    MenuItem {
-                        id: "menu-004-2".to_string(),
-                        name: "訂閱列表".to_string(),
-                        icon: Some("OrderedListOutlined".to_string()),
-                        path: Some("/subscriptions/orders".to_string()),
-                        parent_id: Some("menu-004".to_string()),
-                        order: 2,
-                        status: true,
-                        children: None,
-                    },
-                ]),
-            },
-            MenuItem {
-                id: "menu-005".to_string(),
-                name: "數據分析".to_string(),
-                icon: Some("BarChartOutlined".to_string()),
-                path: Some("/analytics".to_string()),
-                parent_id: None,
-                order: 5,
-                status: true,
-                children: Some(vec![
-                    MenuItem {
-                        id: "menu-005-1".to_string(),
-                        name: "總覽".to_string(),
-                        icon: Some("PieChartOutlined".to_string()),
-                        path: Some("/analytics/overview".to_string()),
-                        parent_id: Some("menu-005".to_string()),
-                        order: 1,
-                        status: true,
-                        children: None,
-                    },
-                    MenuItem {
-                        id: "menu-005-2".to_string(),
-                        name: "收入報表".to_string(),
-                        icon: Some("RiseOutlined".to_string()),
-                        path: Some("/analytics/revenue".to_string()),
-                        parent_id: Some("menu-005".to_string()),
-                        order: 2,
-                        status: true,
-                        children: None,
-                    },
-                ]),
-            },
-            MenuItem {
-                id: "menu-006".to_string(),
-                name: "系統設定".to_string(),
-                icon: Some("SettingOutlined".to_string()),
-                path: Some("/settings".to_string()),
-                parent_id: None,
-                order: 6,
-                status: true,
-                children: Some(vec![
-                    MenuItem {
-                        id: "menu-006-1".to_string(),
-                        name: "角色管理".to_string(),
-                        icon: Some("TeamOutlined".to_string()),
-                        path: Some("/settings/roles".to_string()),
-                        parent_id: Some("menu-006".to_string()),
-                        order: 1,
-                        status: true,
-                        children: None,
-                    },
-                    MenuItem {
-                        id: "menu-006-2".to_string(),
-                        name: "選單管理".to_string(),
-                        icon: Some("MenuOutlined".to_string()),
-                        path: Some("/settings/menus".to_string()),
-                        parent_id: Some("menu-006".to_string()),
-                        order: 2,
-                        status: true,
-                        children: None,
-                    },
-                    MenuItem {
-                        id: "menu-006-3".to_string(),
-                        name: "系統參數".to_string(),
-                        icon: Some("SlidersOutlined".to_string()),
-                        path: Some("/settings/parameters".to_string()),
-                        parent_id: Some("menu-006".to_string()),
-                        order: 3,
-                        status: true,
-                        children: None,
-                    },
-                ]),
-            },
-            MenuItem {
-                id: "menu-007".to_string(),
-                name: "審計日誌".to_string(),
-                icon: Some("AuditOutlined".to_string()),
-                path: Some("/audit".to_string()),
-                parent_id: None,
-                order: 7,
-                status: true,
-                children: Some(vec![
-                    MenuItem {
-                        id: "menu-007-1".to_string(),
-                        name: "操作日誌".to_string(),
-                        icon: Some("FileSearchOutlined".to_string()),
-                        path: Some("/audit/logs".to_string()),
-                        parent_id: Some("menu-007".to_string()),
-                        order: 1,
-                        status: true,
-                        children: None,
-                    },
-                    MenuItem {
-                        id: "menu-007-2".to_string(),
-                        name: "登入日誌".to_string(),
-                        icon: Some("LoginOutlined".to_string()),
-                        path: Some("/audit/logins".to_string()),
-                        parent_id: Some("menu-007".to_string()),
-                        order: 2,
-                        status: true,
-                        children: None,
-                    },
-                ]),
-            },
-        ],
+// ==================== HANDLERS ====================
+
+// 取得菜單列表 (樹狀結構)
+pub async fn tree(
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    // 取得所有頂級菜單
+    let root_menus: Vec<MenuItem> = sqlx::query_as!(
+        MenuItem,
+        r#"
+        SELECT id, name, icon, path, parent_id, order, status, created_at, updated_at
+        FROM menus
+        WHERE parent_id IS NULL AND status = 1
+        ORDER BY `order`
+        "#
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+
+    // 遞迴取得子菜單
+    let mut menu_nodes: Vec<MenuNode> = Vec::new();
+    for menu in root_menus {
+        let children = get_children(&pool, &menu.id).await;
+        menu_nodes.push(MenuNode {
+            id: menu.id,
+            name: menu.name,
+            icon: menu.icon,
+            path: menu.path,
+            order: menu.order,
+            status: menu.status,
+            children,
+        });
+    }
+
+    Json(MenuTreeResponse { menus: menu_nodes })
+}
+
+// 取得菜單列表 (扁平)
+pub async fn list(
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    let menus: Vec<MenuItem> = sqlx::query_as!(
+        MenuItem,
+        r#"
+        SELECT id, name, icon, path, parent_id, order, status, created_at, updated_at
+        FROM menus
+        ORDER BY `order`
+        "#
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+
+    Json(MenuListResponse {
+        menus,
+        total: menus.len() as i64,
     })
 }
 
-// 取得樹狀結構
-pub async fn tree() -> impl IntoResponse {
-    list().await
+// 取得菜單詳情
+pub async fn get(
+    Path(id): Path<String>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    let menu: Option<MenuItem> = sqlx::query_as!(
+        MenuItem,
+        r#"
+        SELECT id, name, icon, path, parent_id, order, status, created_at, updated_at
+        FROM menus WHERE id = ?
+        "#,
+        id
+    )
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+
+    match menu {
+        Some(menu) => Json(menu),
+        None => Json(serde_json::json!({
+            "error": "菜單不存在",
+            "code": "MENU_NOT_FOUND"
+        })),
+    }
 }
 
-// 創建菜單
-pub async fn create(Json(payload): Json<CreateMenuRequest>) -> impl IntoResponse {
+// 建立菜單
+pub async fn create(
+    Json(payload): Json<CreateMenuRequest>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    let menu_id = uuid::Uuid::new_v4().to_string();
+    
+    // 檢查父級是否存在
+    if let Some(parent_id) = &payload.parent_id {
+        let exists: Option<String> = sqlx::query_scalar!(
+            "SELECT id FROM menus WHERE id = ?",
+            parent_id
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+
+        if exists.is_none() {
+            return Json(serde_json::json!({
+                "error": "父級菜單不存在",
+                "code": "PARENT_NOT_FOUND"
+            }));
+        }
+    }
+
+    let _ = sqlx::query!(
+        r#"
+        INSERT INTO menus (id, name, icon, path, parent_id, order, status)
+        VALUES (?, ?, ?, ?, ?, ?, 1)
+        "#,
+        menu_id, payload.name, payload.icon, payload.path, payload.parent_id, payload.order
+    )
+    .execute(&pool)
+    .await;
+
     Json(serde_json::json!({
         "success": true,
         "menu": {
-            "id": "new-menu-id",
+            "id": menu_id,
             "name": payload.name,
             "path": payload.path,
             "order": payload.order,
@@ -277,25 +203,152 @@ pub async fn create(Json(payload): Json<CreateMenuRequest>) -> impl IntoResponse
 }
 
 // 更新菜單
-pub async fn update(Path(id): Path<String>, Json(payload): Json<UpdateMenuRequest>) -> impl IntoResponse {
+pub async fn update(
+    Path(id): Path<String>,
+    Json(payload): Json<UpdateMenuRequest>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    // 檢查菜單是否存在
+    let exists: Option<String> = sqlx::query_scalar!(
+        "SELECT id FROM menus WHERE id = ?",
+        id
+    )
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+
+    if exists.is_none() {
+        return Json(serde_json::json!({
+            "error": "菜單不存在",
+            "code": "MENU_NOT_FOUND"
+        }));
+    }
+
+    // 檢查父級是否存在 (避免循環引用)
+    if let Some(parent_id) = &payload.parent_id {
+        if parent_id == &id {
+            return Json(serde_json::json!({
+                "error": "不能將菜單設為自己的子菜單",
+                "code": "CIRCULAR_REFERENCE"
+            }));
+        }
+
+        let exists: Option<String> = sqlx::query_scalar!(
+            "SELECT id FROM menus WHERE id = ?",
+            parent_id
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+
+        if exists.is_none() {
+            return Json(serde_json::json!({
+                "error": "父級菜單不存在",
+                "code": "PARENT_NOT_FOUND"
+            }));
+        }
+    }
+
+    let _ = sqlx::query!(
+        r#"
+        UPDATE menus 
+        SET name = ?, icon = ?, path = ?, parent_id = ?, `order` = ?, updated_at = NOW()
+        WHERE id = ?
+        "#,
+        payload.name, payload.icon, payload.path, payload.parent_id, payload.order, id
+    )
+    .execute(&pool)
+    .await;
+
     Json(serde_json::json!({
         "success": true,
-        "message": "Menu updated successfully"
+        "message": "菜單更新成功"
     }))
 }
 
 // 刪除菜單
-pub async fn delete(Path(id): Path<String>) -> impl IntoResponse {
+pub async fn delete(
+    Path(id): Path<String>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    // 檢查是否有子菜單
+    let children_count: i64 = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM menus WHERE parent_id = ?",
+        id
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap_or(Some(0))
+    .unwrap_or(0);
+
+    if children_count > 0 {
+        return Json(serde_json::json!({
+            "error": "請先刪除子菜單",
+            "code": "HAS_CHILDREN",
+            "children_count": children_count
+        }));
+    }
+
+    let _ = sqlx::query!("DELETE FROM menus WHERE id = ?", id)
+        .execute(&pool)
+        .await;
+
     Json(serde_json::json!({
         "success": true,
-        "message": "Menu deleted successfully"
+        "message": "菜單刪除成功"
     }))
 }
 
 // 調整順序
-pub async fn reorder(Json(_payload): Json<ReorderRequest>) -> impl IntoResponse {
+pub async fn reorder(
+    Json(payload): Json<ReorderRequest>,
+    pool: axum::extract::State<sqlx::MySqlPool>,
+) -> impl IntoResponse {
+    for item in payload.orders {
+        let _ = sqlx::query!(
+            "UPDATE menus SET `order` = ?, updated_at = NOW() WHERE id = ?",
+            item.order, item.id
+        )
+        .execute(&pool)
+        .await;
+    }
+
     Json(serde_json::json!({
         "success": true,
-        "message": "Menus reordered successfully"
+        "message": "菜單順序更新成功"
     }))
+}
+
+// ==================== HELPER FUNCTIONS ====================
+
+async fn get_children(pool: &sqlx::MySqlPool, parent_id: &str) -> Vec<MenuNode> {
+    let children: Vec<MenuItem> = sqlx::query_as!(
+        MenuItem,
+        r#"
+        SELECT id, name, icon, path, parent_id, order, status, created_at, updated_at
+        FROM menus
+        WHERE parent_id = ? AND status = 1
+        ORDER BY `order`
+        "#
+        parent_id
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    let mut nodes: Vec<MenuNode> = Vec::new();
+    for child in children {
+        let grandchildren = get_children(pool, &child.id).await;
+        nodes.push(MenuNode {
+            id: child.id,
+            name: child.name,
+            icon: child.icon,
+            path: child.path,
+            order: child.order,
+            status: child.status,
+            children: grandchildren,
+        });
+    }
+
+    nodes
 }
