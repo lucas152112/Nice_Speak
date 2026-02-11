@@ -8,38 +8,35 @@ mod auth;
 mod conversation;
 mod user;
 mod database;
+mod device;
 
 use config::Config;
+use axum::routing::post;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // 載入環境變數
     dotenv().ok();
     env_logger::init();
-
-    // 讀取配置
     let config = Config::from_env()?;
-
-    // 建立資料庫連線池
     let pool = database::create_pool(&config.database_url).await?;
 
-    // CORS 設定
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    let cors = tower_http::cors::CorsLayer::new()
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers(tower_http::cors::Any);
 
-    // 建立路由
-    let app = Router::new()
+    let app = axum::Router::new()
         .route("/health", post(|| async { "OK" }))
         .route("/api/v1/auth/register", post(auth::register))
         .route("/api/v1/auth/login", post(auth::login))
         .route("/api/v1/user/profile", post(user::get_profile))
+        .route("/api/v1/devices/status", post(device::check_status))
+        .route("/api/v1/devices/register", post(device::register_device))
+        .route("/api/v1/devices/mark-trial-used", post(device::mark_trial_used))
         .layer(cors)
         .with_state(pool.clone());
 
-    // 建立伺服器
-    let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
+    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], config.port));
     log::info!("🚀 Server running on http://{}", addr);
 
     axum::Server::bind(&addr)
