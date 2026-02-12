@@ -1,0 +1,132 @@
+# =====================================================
+# Docker Compose - Nice Speak 管理後台
+# =====================================================
+# Version: v1.0.0
+# Date: 2025-02-12
+# =====================================================
+
+services:
+  # MySQL 資料庫
+  mysql:
+    image: mysql:8.0
+    container_name: nicespeak-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nicespeak}
+      MYSQL_USER: ${MYSQL_USER:-nicespeak}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-nicespeak123}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nicespeak-network
+
+  # Redis 快取
+  redis:
+    image: redis:7-alpine
+    container_name: nicespeak-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nicespeak-network
+
+  # Rust 後端 API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nicespeak-backend
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=mysql://${MYSQL_USER:-nicespeak}:${MYSQL_PASSWORD:-nicespeak123}@mysql:3306/${MYSQL_DATABASE:-nicespeak}
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+      - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
+      - RUST_LOG=${RUST_LOG:-info}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - nicespeak-network
+
+  # Nuxt.js 前端
+  frontend:
+    image: node:20-alpine
+    container_name: nicespeak-frontend
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      - NUXT_PUBLIC_API_BASE=${API_BASE_URL:-http://localhost:8080}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./web:/app:ro
+    command: >
+      sh -c "npm install && npm run build && npm run start"
+    depends_on:
+      - backend
+    networks:
+      - nicespeak-network
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: nicespeak-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_SSL_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./web/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - nicespeak-network
+
+networks:
+  nicespeak-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
