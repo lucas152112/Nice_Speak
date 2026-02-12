@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admin-backend-config
+  labels:
+    app: admin-backend
+data:
+  ASPNETCORE_ENVIRONMENT: Production
+  ConnectionStrings__DefaultConnection: "Data Source=/data/nice_speak_admin.db"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-backend-secret
+type: Opaque
+stringData:
+  Jwt__SecretKey: "YourSecretKeyHere-ChangeInProduction"
+  Jwt__Issuer: "NiceSpeak.Admin"
+  Jwt__Audience: "NiceSpeak.Admin.Api"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-backend
+  labels:
+    app: admin-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admin-backend
+  template:
+    metadata:
+      labels:
+        app: admin-backend
+    spec:
+      containers:
+      - name: admin-backend
+        image: nicespeak/admin-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: admin-backend-config
+              key: ASPNETCORE_ENVIRONMENT
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            configMapKeyRef:
+              name: admin-backend-config
+              key: ConnectionStrings__DefaultConnection
+        - name: Jwt__SecretKey
+          valueFrom:
+            secretKeyRef:
+              name: admin-backend-secret
+              key: Jwt__SecretKey
+        - name: Jwt__Issuer
+          valueFrom:
+            secretKeyRef:
+              name: admin-backend-secret
+              key: Jwt__Issuer
+        - name: Jwt__Audience
+          valueFrom:
+            secretKeyRef:
+              name: admin-backend-secret
+              key: Jwt__Audience
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-backend
+spec:
+  selector:
+    app: admin-backend
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
