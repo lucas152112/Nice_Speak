@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/providers.dart';
+import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +8,10 @@ import 'package:intl/intl.dart';
 import 'core/config.dart';
 import 'core/theme.dart';
 import 'services/api_service.dart';
+import 'providers/auth_provider.dart';
+import 'providers/scenarios_provider.dart';
+import 'providers/practice_provider.dart';
+import 'providers/subscription_provider.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/login/login_screen.dart';
 import 'screens/home/home_screen.dart';
